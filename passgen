@@ -1,0 +1,100 @@
+#!/bin/lua
+
+-- Setting default values
+
+local VERSION = 0.1
+local length = 16
+local charset = "ascii"
+-- local charlist = {} -- Used for 'custom' charset mode
+local warning = true
+local randomSource = io.open("/dev/random","rb")
+
+-- Argument parsing
+
+function string.starts(String,Start)
+	return string.sub(String,1,string.len(Start))==Start
+end
+
+function treatArg(argument)
+	if argument == "--no-warning" then
+		warning = false
+	elseif argument:starts("--length=") then
+		length = tonumber(argument:sub(10))
+	elseif argument:starts("--charset=") then
+		charset = argument:sub(11)
+	elseif argument == "--help" then
+		print("passgen v"..VERSION)
+		print("by cafehaine")
+		os.exit(0)
+	else
+		print("Unknown argument "..argument)
+	end
+end
+
+for k,v in ipairs(arg) do
+	treatArg(v)
+end
+
+-- Functions
+
+-- randNum(min,max[,min2,max2,...])
+-- generates a number included in the specified ranges
+-- IMPORTANT if ranges overlap then the overlaping portions will be n times more
+-- probable!
+local function randNum(...)
+	local args = {...}
+	local values = {}
+	local index = 0
+	for i = 1,#args,2 do
+		local min = args[i]
+		local max = args[i + 1]
+		for j = min,max do
+			index = index + 1
+			values[index] = j
+		end
+	end
+	if index > 255 then
+		error("More than 255 random values, this is not supported at "..
+		"the moment",2)
+	end
+	local rand = (randomSource:read(1):byte()) % (index) + 1
+	return values[rand]
+end
+
+local function randomChar(charset, charlist)
+	local output
+	if charset == "ascii" then
+		output = string.char(randNum(33,126))
+	elseif charset == "numerical" then
+		output = string.char(randNum(48,57))
+	elseif charset == "lowercase" then
+		output = string.char(randNum(97,122))
+	elseif charset == "uppercase" then
+		output = string.char(randNum(65,90))
+	elseif charset == "alpha" then
+		output = string.char(randNum(65,90,97,122))
+	elseif charset == "alphanum" then
+		output = string.char(randNum(48,57,65,90,97,122))
+	else
+		error("Invalid charset: " .. charset,2)
+	end
+	return output
+end
+
+local function generatePassword() end
+
+-- Body
+
+if warning then
+	print("This program uses /dev/random which will block the program if "..
+		"there isn't enough entropy.\nIf the program seems stuck try "..
+		"moving around your mouse.")
+end
+
+local password = {}
+for i=1,length do
+	password[i] = randomChar(charset,charlist)
+end
+
+print(table.concat(password))
+randomSource:close()
